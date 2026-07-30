@@ -3,29 +3,53 @@ name: Update today xin wen lian bo
 on:
   workflow_dispatch:
   schedule:
-    # 东八区 (UTC+8), 所以要-8小时
+    # UTC 时间，对应北京时间 20:30
     - cron: '30 12 * * *'
 
 permissions:
   contents: write
-  
+
+concurrency:
+  group: update-news
+  cancel-in-progress: false
+
 jobs:
   update:
     name: Update today xin wen lian bo
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          node-version: 16
-      - run: npm install
-      - run: npm run index
-      - run: git config --local user.email "github-actions[bot]@github.com"
-      - run: git config --local user.name "github-actions[bot]"
-      - run: git add .
-      - run: git commit -m "AUTO UPDATE [bot]"
-      - name: Push master changes
-        uses: ad-m/github-push-action@master
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: master
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate news
+        run: npm run index
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit changes
+        run: |
+          git add .
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "AUTO UPDATE [bot]"
+
+      - name: Sync latest changes
+        run: |
+          git pull --rebase origin master
+
+      - name: Push changes
+        run: |
+          git push origin HEAD:master
